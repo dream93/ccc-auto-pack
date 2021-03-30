@@ -14,8 +14,8 @@ orientation: portrait
 engineVer: 2.4.3
 
 # 输出目录
-winOutputDir: 'F:'
-macOutputDir: '/Users/zhise'
+winOutputDir: 'E:'
+macOutputDir: '/Users/***'
 
 # 平台相关，可根据自己需求修改
 
@@ -46,7 +46,3 @@ appABIs:
     - armeabi-v7a
 # 脚本加密
 xxteaKey: 318927a2-2183-4c
-
-# SDK接入相关
-buglyAppId: 1
-buglyAppKey: test

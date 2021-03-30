@@ -122,16 +122,18 @@ function packAPK() {
     let password;
     let alias;
     let keyPassword;
+    // 这个比较重要，不要配置在配置里
+    // 此处示例为CocosCreator的调试key
     if (os.platform() === 'darwin') {
-        storeFile = '';
-        password = '';
-        alias = '';
-        keyPassword = '';
+        storeFile = `/Applications/CocosCreator/Creator/${configData.engineVer}/CocosCreator.app/Contents/Resources/static/build-templates/native/debug.keystore`;
+        password = '123456';
+        alias = 'debug_keystore';
+        keyPassword = '123456';
     } else if (os.platform === 'win32') {
-        storeFile = '';
-        password = '';
-        alias = '';
-        keyPassword = '';
+        storeFile = `D:/CocosDashboard/resources/.editors/Creator/${configData.engineVer}/resources/static/build-templates/native/debug.keystore`;
+        password = '123456';
+        alias = 'debug_keystore';
+        keyPassword = '123456';
     }
 
     const androidDir = path.join(configData.outputDir, configData.title, 'jsb-link', 'frameworks', 'runtime-src', 'proj.android-studio');
@@ -155,42 +157,45 @@ function packAPK() {
             .save(path.join(iconPath, 'ic_launcher.png'));
     }
 
-    // 修改settings.gradle 删除':game'和':instantapp' 项目，不删除，则下面的打包语句需要对应修改成需要打包的项目
+    // 修改settings.gradle 删除':game'和':instantapp' 项目
+    // 不删除，则下面的打包语句需要对应修改成需要打包的项目
     const sgPath = path.join(androidDir, 'settings.gradle');
-    let sgData = fs.readFileSync(sgPath).toString().replace(/\'\:instantapp\'/, "").replace(/\'\:game\'/, "").replace(/\,/, "").replace(/\,/, "");
+    let sgData = fs.readFileSync(sgPath).toString().replace(/\,[ ]*\'\:game\'[ ]*\,[ ]*\'\:instantapp\'/, "");
     fs.writeFileSync(sgPath, sgData);
 
-
+    // gralde.properties的修改
+    const gpPath = path.join(androidDir, 'gradle.properties');
+    let gpData = fs.readFileSync(gpPath).toString();
+    gpData = gpData.replace(/PROP_COMPILE_SDK_VERSION=.*/, `PROP_COMPILE_SDK_VERSION=${configData.apiLevel}`);
+    gpData = gpData.replace(/PROP_TARGET_SDK_VERSION=.*/, `PROP_TARGET_SDK_VERSION=${configData.apiLevel}`);
+    gpData = gpData.replace(/PROP_APP_ABI=.*/, `PROP_APP_ABI=${JSON.stringify(configData.appABIs).replace('[', '').replace(']', '').replace(/\"/g, '').replace(/\,/g, ":")}`);
+    gpData = gpData.replace(/RELEASE_STORE_FILE=.*/, `RELEASE_STORE_FILE=${storeFile}`);
+    gpData = gpData.replace(/RELEASE_STORE_PASSWORD=.*/, `RELEASE_STORE_PASSWORD=${password}`);
+    gpData = gpData.replace(/RELEASE_KEY_ALIAS=.*/, `RELEASE_KEY_ALIAS=${alias}`);
+    gpData = gpData.replace(/RELEASE_KEY_PASSWORD=.*/, `RELEASE_KEY_PASSWORD=${keyPassword}`);
+    fs.writeFileSync(gpPath, gpData);
 
     // 升级gradle的修改
-    const gwProp = `distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-5.6.4-all.zip`;
-    fs.writeFileSync(path.join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties'), gwProp);
-    // 修改mk
+
+    // 1. 修改gradle-wrapper.properties
+    const gwpPath = path.join(androidDir, 'gradle', 'wrapper', 'gradle-wrapper.properties');
+    const gwpData = fs.readFileSync(gwpPath).toString().replace(/distributionUrl\=.*/, "distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-all.zip");
+    fs.writeFileSync(gwpPath, gwpData);
+
+    // 2. 修改工程的build.gradle
+    const pbgPath = path.join(androidDir, 'build.gradle');
+    const pbgData = fs.readFileSync(pbgPath).toString().replace(/gradle\:[0-9.]+/, "gradle:3.6.4");
+    fs.writeFileSync(pbgPath, pbgData);
+
+    // 3. 修改mk
     const mkPath = path.join(androidDir, 'jni', 'CocosAndroid.mk');
     let mkText = fs.readFileSync(mkPath).toString().replace('cocos2djs_shared', 'cocos2djs');
     fs.writeFileSync(mkPath, mkText);
-    // gralde.properties的修改
-    const gp = `
-PROP_COMPILE_SDK_VERSION=${configData.apiLevel}
-PROP_MIN_SDK_VERSION=16
-PROP_TARGET_SDK_VERSION=${configData.apiLevel}
-PROP_BUILD_TOOLS_VERSION=28.0.3
-PROP_APP_ABI=${JSON.stringify(configData.appABIs).replace('[', '').replace(']', '').replace(/\"/, '').replace(/\,/, ":")};
-RELEASE_STORE_FILE=${storeFile}
-RELEASE_STORE_PASSWORD=${password}
-RELEASE_KEY_ALIAS=${alias}
-RELEASE_KEY_PASSWORD=${keyPassword}
 
-android.injected.testOnly=false
-    `;
-    fs.writeFileSync(path.join(androidDir, 'gradle.properties'), gp);
+    // 升级gradle的修改完毕
 
-    const appPath = path.join(androidDir, 'app', 'build.gradle');
-    let gradleData = fs.readFileSync(appPath).toString();
+    const abgPath = path.join(androidDir, 'app', 'build.gradle');
+    let gradleData = fs.readFileSync(abgPath).toString();
     let matcher = /\"\$\{outputDir\}\/[a-zA-Z-]+\"/g;
     let matchs = gradleData.match(matcher);
     if (null != matchs) {
@@ -206,7 +211,7 @@ android.injected.testOnly=false
     let matcher3 = /versionName[ ]+\"[0-9.]+\"/;
     gradleData = gradleData.replace(matcher3, `versionName "${configData.appVer}"`);
 
-    fs.writeFileSync(appPath, gradleData);
+    fs.writeFileSync(abgPath, gradleData);
 
     console.log('开始构建APK');
     try {
@@ -237,9 +242,6 @@ android.injected.testOnly=false
 
 
 }
-
-let a = `applicationId "org.cocos2d.demo"`;
-console.log(a.replace(/applicationId[ ]+\"[a-zA-Z0-9_.]+\"/, 'here'));
 
 function uploadHotUpdate() {
     console.log('开始备份未混淆的代码');
@@ -294,7 +296,7 @@ function uploadHotUpdate() {
         }
     });
     fs.writeFileSync(path.join(hotUpdateDir, 'project.manifest'), JSON.stringify(manifest, null, 0)); // manifest较大，不要格式化
-    if (null == manifestPath) {
+    if (null == manifestPath || '' == manifest) {
         console.warn('文件中没有manifest文件，将无法热更！');
     } else {
         fs.writeFileSync(path.join(buildDir, manifestPath), JSON.stringify(manifest, null, 0));

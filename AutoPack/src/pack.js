@@ -231,7 +231,7 @@ function packAPK() {
             // gradlewSpawn.on('exit', (code) => {
             //     console.log('exit code : ' + code);
             // });
-        } else if (os.platform === 'win32') {
+        } else if (os.platform() === 'win32') {
             execFileSync('gradlew.bat', [':' + configData.title + ':assembleRelease'], { cwd: androidDir });
         }
         return true;
